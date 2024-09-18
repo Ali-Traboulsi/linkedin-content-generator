@@ -5,7 +5,7 @@ import * as puppeteer from "puppeteer";
 import * as fs from "fs";
 import { cleanArticleContent } from "../../utils/article-cleaner";
 
-const scrapMainArticlesFromFcc = async () => {
+export const scrapMainArticlesFromFcc = async () => {
   try {
     const browser = await puppeteer.launch();
     const page = await browser.newPage();
@@ -118,7 +118,7 @@ const scrapMainArticlesFromFcc = async () => {
   }
 };
 
-const scrapRandomArticleFromFCC = async () => {
+export const scrapRandomArticleFromFCC = async () => {
   try {
     const articles = JSON.parse(
       fs.readFileSync("freecodecamp_articles.json", "utf-8")
@@ -178,62 +178,57 @@ const scrapRandomArticleFromFCC = async () => {
   }
 };
 
-const scrapTechNews = async () => {
-  try {
-    const { data: markup } = await axios.get("https://techcrunch.com/");
-    const $ = cheerio.load(markup);
-    console.log("Scraping TechCrunch");
-    // console.log($);
+// export const scrapTechNews = async () => {
+//   try {
+//     const { data: markup } = await axios.get("https://techcrunch.com/");
+//     const $ = cheerio.load(markup);
+//     console.log("Scraping TechCrunch");
+//     // console.log($);
 
-    $("article a").each((i, element) => {
-      const title = $(element).text().trim();
-      console.log(`Article ${i + 1}: ${title}`);
-    });
+//     $("article a").each((i, element) => {
+//       const title = $(element).text().trim();
+//       console.log(`Article ${i + 1}: ${title}`);
+//     });
 
-    const featured = $("div.is-featured");
+//     const featured = $("div.is-featured");
 
-    console.log("Featured article: ", featured);
+//     console.log("Featured article: ", featured);
 
-    // Extract the article title (h2) inside the featured div
-    const title = featured.find("h2 a").text().trim();
+//     // Extract the article title (h2) inside the featured div
+//     const title = featured.find("h2 a").text().trim();
 
-    // Extract the article description (excerpt)
-    const excerpt = featured.find(".wp-block-post-excerpt p").text().trim();
+//     // Extract the article description (excerpt)
+//     const excerpt = featured.find(".wp-block-post-excerpt p").text().trim();
 
-    // Extract the image URL from the figure
-    const imageUrl = featured.find("figure img").attr("src");
+//     // Extract the image URL from the figure
+//     const imageUrl = featured.find("figure img").attr("src");
 
-    // Extract the article link from the anchor (a) tag inside the h2
-    const link = featured.find("h2 a").attr("href");
+//     // Extract the article link from the anchor (a) tag inside the h2
+//     const link = featured.find("h2 a").attr("href");
 
-    // Extract the author's name and link
-    const author = featured
-      .find(".wp-block-tc23-author-card-name a")
-      .text()
-      .trim();
-    const authorLink = featured
-      .find(".wp-block-tc23-author-card-name a")
-      .attr("href");
+//     // Extract the author's name and link
+//     const author = featured
+//       .find(".wp-block-tc23-author-card-name a")
+//       .text()
+//       .trim();
+//     const authorLink = featured
+//       .find(".wp-block-tc23-author-card-name a")
+//       .attr("href");
 
-    // Extract the time of publication
-    const timeAgo = featured.find("time").text().trim();
+//     // Extract the time of publication
+//     const timeAgo = featured.find("time").text().trim();
 
-    console.log("Featured article:");
-    console.log(`Title: ${title}`);
-    console.log(`Link: ${link}`);
-    console.log(`Excerpt: ${excerpt}`);
-    console.log(`Image URL: ${imageUrl}`);
-    console.log(`Author: ${author}`);
-    console.log(`Author Link: ${authorLink}`);
-    console.log(`Published: ${timeAgo}`);
+//     console.log("Featured article:");
+//     console.log(`Title: ${title}`);
+//     console.log(`Link: ${link}`);
+//     console.log(`Excerpt: ${excerpt}`);
+//     console.log(`Image URL: ${imageUrl}`);
+//     console.log(`Author: ${author}`);
+//     console.log(`Author Link: ${authorLink}`);
+//     console.log(`Published: ${timeAgo}`);
 
-    console.log("Featured article: ", featured.text());
-  } catch (error) {
-    console.error("Error scraping TechCrunch:", error);
-  }
-};
-
-// scrapTechNews();
-// scrapMainArticlesFromFcc();
-
-scrapRandomArticleFromFCC();
+//     console.log("Featured article: ", featured.text());
+//   } catch (error) {
+//     console.error("Error scraping TechCrunch:", error);
+//   }
+// };

@@ -3,10 +3,9 @@ import { Request, response, Response } from "express";
 import dotenv from "dotenv";
 import { jwtDecode } from "jwt-decode";
 import jwt from "jsonwebtoken";
+import { uploadMediaToLinekedin } from "../helpers/upload-media-to-linkedin";
 
 dotenv.config();
-
-const linkedInAPIBase = "https://api.linkedin.com/v2";
 
 // const accessToken = process.env.LINKEDIN_ACCESS_TOKEN;
 
@@ -36,11 +35,14 @@ export const getLinkedInConnections = async (req: Request, res: Response) => {
     console.log("Access Token:", accessToken);
 
     // Test fetching profile information
-    const response = await axios.get(`${linkedInAPIBase}/me`, {
-      headers: {
-        Authorization: `Bearer AQXWO-mTQk6xbZC7Kw8huzg3mJydzQrSzARw627xc-jWIJt8OFP56gXH4sLb57_EzhXw47ANH95V3_6pHBqXsDXpB5wGoFRxCUwv7Foursx5hxueMHATjFPqV6FW7nRZapk5Ck1cTzANo__1Up31INwKg5q83mLdWG2UHBYTb6O8t_8Sy6UG1q9GUrxXvlVjOWvkq5PjcKy9ycmZVK_UZyrsuMzoX_nOZJyHBBbn9NQ_1uW_bEYFzLe75-pc8igF4nQnIQKx4EHs4FCrfsx-vI4cDG4Xc6-DfebwIvgyWZeh03hYHAicR-XIKydF-gLl6qfuDZok8q-ZhQVast_8Esyed0gs6g`,
-      },
-    });
+    const response = await axios.get(
+      `${process.env.LINKEDIN_UPLOAD_BASE_URL}/me`,
+      {
+        headers: {
+          Authorization: `Bearer AQXWO-mTQk6xbZC7Kw8huzg3mJydzQrSzARw627xc-jWIJt8OFP56gXH4sLb57_EzhXw47ANH95V3_6pHBqXsDXpB5wGoFRxCUwv7Foursx5hxueMHATjFPqV6FW7nRZapk5Ck1cTzANo__1Up31INwKg5q83mLdWG2UHBYTb6O8t_8Sy6UG1q9GUrxXvlVjOWvkq5PjcKy9ycmZVK_UZyrsuMzoX_nOZJyHBBbn9NQ_1uW_bEYFzLe75-pc8igF4nQnIQKx4EHs4FCrfsx-vI4cDG4Xc6-DfebwIvgyWZeh03hYHAicR-XIKydF-gLl6qfuDZok8q-ZhQVast_8Esyed0gs6g`,
+        },
+      }
+    );
 
     res.json(response.data);
   } catch (error) {
@@ -59,29 +61,62 @@ export const createLinkedinPost = async (req: Request, res: Response) => {
   console.log("Access Token:", accessToken);
 
   try {
+    let assetUrn: string | null = null;
+
+    // Step 1: Optional media (PDF) upload if the file is present
+    const pdfFile: Express.Multer.File | undefined = req.file;
+
+    if (pdfFile) {
+      const fileUploadResponse = await uploadMediaToLinekedin({
+        ownerURN: req.body.authorURN,
+        file: pdfFile,
+      });
+      assetUrn = fileUploadResponse
+        ? fileUploadResponse.data.value.asset
+        : null;
+    }
+
     const postBody = {
-      author: "urn:li:person:Smx3m-uJ9F", // This is where you use the LinkedIn member URN
+      author: `urn:li:person:${req.body.authorURN}`, // This is where you use the LinkedIn member URN
       lifecycleState: "PUBLISHED",
       specificContent: {
         "com.linkedin.ugc.ShareContent": {
           shareCommentary: {
-            text: "This is a second test post from the LinkedIn API.",
+            text: req.body.content,
           },
-          shareMediaCategory: "NONE",
+          shareMediaCategory: assetUrn ? "CAROUSEL" : "NONE",
+          media: assetUrn
+            ? [
+                {
+                  status: "READY",
+                  description: {
+                    text: req.body.pdfDescription || "PDF file",
+                  },
+                  media: assetUrn,
+                  title: {
+                    text: req.body.pdfTitle || "Attached PDF",
+                  },
+                },
+              ]
+            : [],
         },
       },
       visibility: {
-        "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC",
+        "com.linkedin.ugc.MemberNetworkVisibility": req.body.visibility,
       },
     };
 
-    const response = await axios.post(`${linkedInAPIBase}/ugcPosts`, postBody, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-        "X-Restli-Protocol-Version": "2.0.0",
-      },
-    });
+    const response = await axios.post(
+      `${process.env.LINKEDIN_UPLOAD_BASE_URL}/ugcPosts`,
+      postBody,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+          "X-Restli-Protocol-Version": "2.0.0",
+        },
+      }
+    );
 
     console.log("Post created successfully:", response.data);
     res.send(response.data);
@@ -159,3 +194,5 @@ export const decodeToken = async (req: Request, res: Response) => {
     res.status(500).send("Error decoding token");
   }
 };
+
+// Smx3m-uJ9F

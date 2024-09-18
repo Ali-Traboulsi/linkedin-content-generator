@@ -3,46 +3,109 @@ import * as fs from "fs";
 import * as dotenv from "dotenv";
 import { exit } from "process";
 import cohere, { CohereClient } from "cohere-ai";
+import { Request, Response } from "express";
+import path from "path";
+import { generateSmartCarouselFromContent } from "../helpers/generate-pdf.helper";
+import { uploadMediaToLinekedin } from "../helpers/upload-media-to-linkedin";
+import axios from "axios";
 dotenv.config({
   path: "../../.env",
 });
-
-// const openai = new OpenAI({
-//   apiKey: process.env.OPENAI_API_KEY,
-// });
 
 const co = new CohereClient({
   token: process.env.COHERE_API_KEY,
 });
 
-const article = fs.readFileSync(
-  "../tech-scraping/freecodecamp_random_article.json",
-  "utf-8"
+const filePath = path.join(
+  __dirname,
+  "..",
+  "tech-scraping",
+  "freecodecamp_random_article.json"
 );
+const article = fs.readFileSync(filePath, "utf-8");
 
-const generateLinkedinContent = async (article: string) => {
-  const chunksize = 1000;
-  let generatedContent: string = "";
-  for (let i = 0; i < article.length; i += chunksize) {
-    const generatedContentChunked = await co.generate({
-      prompt: `write a cool and concise Linkedin Post with emojies based on the following article ${article.slice(
-        i,
-        i + chunksize
-      )}`,
+export const generateLinkedinContent = async (req: Request, res: Response) => {
+  try {
+    const generatedContent = await co.generate({
+      prompt: `write a cool,concise, and well-formatted Linkedin Post based on the following ARTICLE ${article}. Note: the generated content should be based on the article content and should always contain LISTINGS and EMOJIES. Include headings, subheadings, bullet points, and numbered lists where necessary`,
     });
-    generatedContent += generatedContentChunked.generations[0].text;
+
+    console.log(JSON.stringify(generatedContent, null, 2));
+
+    const contentText = generatedContent.generations[0].text;
+
+    fs.writeFileSync(
+      "generated_linkedin_content_cohere.md",
+      contentText,
+      "utf-8"
+    );
+
+    // create pdf from content
+    const pdfFilePath = path.join(__dirname, "generated_linkedin_content.pdf");
+    await generateSmartCarouselFromContent(contentText, pdfFilePath);
+
+    const pdfBuffer = fs.readFileSync(pdfFilePath);
+    const pdfFile = {
+      buffer: pdfBuffer,
+      mimetype: "application/pdf",
+      originalname: "generated_linkedin_content_smart.pdf",
+    } as Express.Multer.File;
+
+    // upload the file to linekedin
+    const uploadResponse = await uploadMediaToLinekedin({
+      file: pdfFile,
+      ownerURN: req.body.authorURN,
+    });
+
+    if (!uploadResponse) {
+      return res
+        .status(500)
+        .json({ message: "Error uploading PDF to LinkedIn" });
+    }
+
+    const postBody = {
+      author: `urn:li:person:${req.body.authorURN}`, // This is where you use the LinkedIn member URN
+      lifecycleState: req.body.lifecycleState || "PUBLISHED",
+      specificContent: {
+        "com.linkedin.ugc.ShareContent": {
+          shareCommentary: { text: contentText },
+          shareMediaCategory: "CAROUSEL",
+          media: [
+            {
+              status: "READY",
+              description: { text: "Generated content in PDF format" },
+              media: uploadResponse.data.value.asset,
+              title: { text: "PDF Carousel Item" },
+            },
+          ],
+        },
+      },
+      visibility: {
+        "com.linkedin.ugc.MemberNetworkVisibility":
+          req.body.visibility || "PUBLIC",
+      },
+    };
+
+    const response = await axios.post(
+      `${process.env.LINKEDIN_BASE_URL}/ugcPosts`,
+      postBody,
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.LINKEDIN_ACCESS_TOKEN}`,
+          "Content-Type": "application/json",
+          "X-Restli-Protocol-Version": "2.0.0",
+        },
+      }
+    );
+
+    res
+      .status(200)
+      .json({ message: "Post created with carousel", data: response.data });
+  } catch (error) {
+    console.error("Error generating content:", error);
+    res.status(500).json({ message: "Error generating content" });
   }
-
-  console.log(JSON.stringify(generatedContent, null, 2));
-
-  fs.writeFileSync(
-    "generated_linkedin_content_cohere.md",
-    generatedContent,
-    "utf-8"
-  );
 };
-
-generateLinkedinContent(article);
 
 // const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
