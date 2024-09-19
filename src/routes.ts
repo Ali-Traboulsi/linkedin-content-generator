@@ -4,7 +4,11 @@ import {
   scrapMainArticlesFromFcc,
   scrapRandomArticleFromFCC,
 } from "./tech-scraping/scraper";
-import { generateLinkedinContent } from "./ai/post-generator";
+import {
+  generateContentUsingGroq,
+  generateLinkedinContent,
+  generatePDFFromContent,
+} from "./ai/post-generator";
 
 const router = Router();
 
@@ -15,6 +19,8 @@ router.post("/decode-token", decodeToken);
 router.get("/fcc/articles/main", scrapMainArticlesFromFcc);
 router.get("/fcc/articlee/random", scrapRandomArticleFromFCC);
 
-router.post("/generate-content", generateLinkedinContent);
+router.post("/generate-content", generateContentUsingGroq);
+router.post("/generate-pdf", generatePDFFromContent);
+router.post("post-on-linkedin", createLinkedinPost);
 
 export default router;

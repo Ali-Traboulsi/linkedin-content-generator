@@ -230,7 +230,7 @@ export const generateLinkedinContent = async (req: Request, res: Response) => {
 
 // generateContentByForefront();
 
-const generateContentUsingCrog = async () => {
+export const generateContentUsingGroq = async (req: Request, res: Response) => {
   const croq = new Groq({
     apiKey: process.env.CROQ_API_KEY,
   });
@@ -252,10 +252,14 @@ const generateContentUsingCrog = async () => {
     });
 
     console.log(
-      JSON.stringify(chatCompletion.choices[0].message.content, null, 2)
+      JSON.stringify(
+        chatCompletion.choices.find(() => true)?.message.content,
+        null,
+        2
+      )
     );
 
-    return chatCompletion.choices[0].message.content;
+    return res.status(201).json(chatCompletion.choices.find(() => true));
   } catch (error) {
     if (error instanceof Groq.APIError) {
       console.log(error.status);
@@ -266,5 +270,19 @@ const generateContentUsingCrog = async () => {
   }
 };
 
-// generateContentWithOpenAI();
-generateContentUsingCrog();
+export const generatePDFFromContent = async (req: Request, res: Response) => {
+  const content = req.body.content;
+
+  const pdfFilePath = path.join(
+    __dirname,
+    `generated_linkedin_pdf_${Date.now()}.pdf`
+  );
+
+  try {
+    await generateSmartCarouselFromContent(content, pdfFilePath);
+    return res.status(200).json({ message: "PDF generated successfully" });
+  } catch (error) {
+    console.error("Error generating PDF from content:", error);
+    return res.status(500).json({ message: "Error generating PDF" });
+  }
+};
