@@ -1,4 +1,9 @@
 import axios from "axios";
+import dotenv from "dotenv";
+
+dotenv.config({
+  path: "../../.env",
+});
 
 export const uploadMediaToLinekedin = async ({
   ownerURN,
@@ -9,7 +14,7 @@ export const uploadMediaToLinekedin = async ({
 }) => {
   try {
     const registerUploadResponse = await axios.post(
-      `${process.env.LINKEDIN_UPLOAD_BASE_URL}/assets?action=registerUpload`,
+      `https://api.linkedin.com/rest/assets?action=registerUpload`,
       {
         registerUploadRequest: {
           recipes: ["urn:li:digitalmediaRecipe:feedshare-document"],
@@ -26,6 +31,7 @@ export const uploadMediaToLinekedin = async ({
         headers: {
           Authorization: `Bearer ${process.env.LINKEDIN_ACCESS_TOKEN}`,
           "Content-Type": "application/json",
+          "LinkedIn-Version": "202404",
         },
       }
     );

@@ -11,7 +11,7 @@ const router = Router();
 router.get("/", (_, res) => {
   res.send("Hello World");
 });
-router.get("/decoded-token", decodeToken);
+router.post("/decode-token", decodeToken);
 router.get("/fcc/articles/main", scrapMainArticlesFromFcc);
 router.get("/fcc/articlee/random", scrapRandomArticleFromFCC);
 

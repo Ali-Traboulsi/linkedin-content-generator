@@ -5,6 +5,10 @@ import {
   Content,
   ContentStack,
   ContentText,
+  ContextPageSize,
+  DynamicBackground,
+  DynamicContent,
+  Node,
   StyleDictionary,
   TDocumentDefinitions,
 } from "pdfmake/interfaces";
@@ -47,13 +51,60 @@ const createDocDefinintion = (content: string): TDocumentDefinitions => {
   const docDefinition: {
     content: PDFContent[];
     styles: StyleDictionary;
+    footer?: DynamicContent | Content;
+    background?: DynamicBackground | Content;
+    pageBreakBefore?: (currentNode: Node) => boolean;
   } = {
     content: [],
     styles: {
-      header: { fontSize: 18, bold: true },
-      subheader: { fontSize: 15, bold: true },
-      paragraph: { fontSize: 12 },
-      listItem: { fontSize: 12, margin: [0, 5, 0, 5] },
+      header: {
+        fontSize: 20,
+        bold: true,
+        color: "#000000",
+        margin: [0, 10, 0, 10],
+      },
+      subheader: {
+        fontSize: 16,
+        bold: true,
+        color: "#333333",
+        margin: [0, 8, 0, 8],
+      },
+      paragraph: { fontSize: 12, color: "#666666", margin: [0, 6, 0, 6] },
+      listItem: { fontSize: 12, margin: [0, 5, 0, 5], color: "#444444" },
+    },
+    footer: function (
+      currentPage: number,
+      pageCount: number,
+      pageSize: ContextPageSize
+    ): Content {
+      return {
+        text: `Page ${currentPage} of ${pageCount}`,
+        fontSize: 14,
+        margin: [0, 10, 0, 0],
+        alignment: "center",
+        bold: true,
+        color: "#666666",
+      };
+    },
+    background: function (
+      currentPage: number,
+      pageSize: ContextPageSize
+    ): Content | null | undefined {
+      return {
+        canvas: [
+          {
+            type: "rect",
+            x: 0,
+            y: 0,
+            w: pageSize.width,
+            h: pageSize.height,
+            color: "#F5F5F5",
+          }, // Light grey background
+        ],
+      };
+    },
+    pageBreakBefore: function (currentNode: Node) {
+      return currentNode.style === "listItem"; // This will add a page break before each list item
     },
   };
 
@@ -65,16 +116,12 @@ const createDocDefinintion = (content: string): TDocumentDefinitions => {
     } else if (section.type === "paragraph") {
       docDefinition.content.push({ text: section.text, style: "paragraph" });
     } else if (section.type === "list") {
-      const listItems: Content[] = section.items.map((item: string) => ({
-        text: item,
-        style: "listItem",
-      }));
-      docDefinition.content.push({ ul: listItems } as {
-        ul: {
-          text: string;
-          style: string;
-        }[];
-      }); // Properly adding the list as 'ul'
+      section.items.forEach((item, itemIndex) => {
+        docDefinition.content.push({
+          text: item,
+          style: "listItem",
+        });
+      });
     }
   });
 

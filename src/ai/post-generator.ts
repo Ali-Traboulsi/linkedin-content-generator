@@ -7,9 +7,11 @@ import { Request, Response } from "express";
 import path from "path";
 import { generateSmartCarouselFromContent } from "../helpers/generate-pdf.helper";
 import { uploadMediaToLinekedin } from "../helpers/upload-media-to-linkedin";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
+import groq, { Groq } from "groq-sdk";
+
 dotenv.config({
-  path: "../../.env",
+  path: path.join(__dirname, "..", "..", ".env"),
 });
 
 const co = new CohereClient({
@@ -23,6 +25,73 @@ const filePath = path.join(
   "freecodecamp_random_article.json"
 );
 const article = fs.readFileSync(filePath, "utf-8");
+
+const generateContentByForefront = async () => {
+  const url = "https://api.forefront.ai/v1/chat/completions";
+  const api_key = process.env.FOREFRONT_API_KEY;
+
+  try {
+    console.log("api_key", api_key);
+
+    const response = await axios({
+      method: "POST",
+      url,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${api_key}`,
+      },
+      data: {
+        model: "alpindale/Mistral-7B-v0.2-hf",
+        messages: [
+          {
+            role: "assistant",
+            content: `write a cool, concise, and well-formatted Linkedin Post based on the following ARTICLE ${article}. Note: the generated content should be based on the article content and should always contain LISTINGS and EMOJIES. Include headings, subheadings, bullet points, and numbered lists where necessary`,
+          },
+        ],
+        max_tokens: 2000,
+        temperature: 0.7,
+      },
+    });
+
+    const generatedData = response.data;
+
+    console.log(JSON.stringify(generatedData, null, 2));
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+export const generateContentWithOpenAI = async () => {
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  const url = "https://api.openai.com/v1/completions";
+
+  const options = {
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+  };
+
+  const body = {
+    model: "gpt-3.5-turbo-0125",
+    prompt: `write a cool,concise, and well-formatted Linkedin Post based on the following ARTICLE ${article}. Note: the generated content should be based on the article content and should always contain LISTINGS and EMOJIES. Include headings, subheadings, bullet points, and numbered lists where necessary`,
+  };
+
+  try {
+    const response = await axios.post(url, body, options);
+
+    console.log(JSON.stringify(response.data, null, 2));
+  } catch (error) {
+    if (error instanceof AxiosError) {
+      console.error("Error generating content:", {
+        status: error.response?.status,
+        data: error.response?.data,
+      });
+    }
+    console.error("Error generating content:", error);
+  }
+};
 
 export const generateLinkedinContent = async (req: Request, res: Response) => {
   try {
@@ -158,3 +227,44 @@ export const generateLinkedinContent = async (req: Request, res: Response) => {
 // };
 
 // generateContent(article);
+
+// generateContentByForefront();
+
+const generateContentUsingCrog = async () => {
+  const croq = new Groq({
+    apiKey: process.env.CROQ_API_KEY,
+  });
+
+  try {
+    const chatCompletion = await croq.chat.completions.create({
+      model: "llama3-70b-8192",
+      messages: [
+        {
+          role: "system",
+          content: "You are a linkedin content creator",
+        },
+        {
+          role: "user",
+          content: `write a cool, concise, and well-formatted Linkedin Post based on the following ARTICLE ${article}. Note: the generated content should be based on the article content and should always contain LISTINGS and EMOJIES. Include headings, subheadings, bullet points, and numbered lists where necessary`,
+          name: "linkedin-post",
+        },
+      ],
+    });
+
+    console.log(
+      JSON.stringify(chatCompletion.choices[0].message.content, null, 2)
+    );
+
+    return chatCompletion.choices[0].message.content;
+  } catch (error) {
+    if (error instanceof Groq.APIError) {
+      console.log(error.status);
+      console.log(error.name);
+      console.log(error.headers); // {server: 'nginx', ...}
+    }
+    console.error("Error generating content using Croq:", error);
+  }
+};
+
+// generateContentWithOpenAI();
+generateContentUsingCrog();
