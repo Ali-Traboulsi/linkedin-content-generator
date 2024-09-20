@@ -3,16 +3,12 @@ import pdfMakePrinter from "pdfmake";
 import path from "path";
 import {
   Content,
-  ContentStack,
-  ContentText,
   ContextPageSize,
-  DynamicBackground,
-  DynamicContent,
   Node,
-  StyleDictionary,
   TDocumentDefinitions,
 } from "pdfmake/interfaces";
 import { PDFContent, Section } from "./types";
+import * as puppeteer from "puppeteer";
 
 export const generateSmartCarouselFromContent = async (
   content: string,
@@ -321,7 +317,7 @@ const parseStructuredContent = (content: string) => {
 };
 
 import { Shape, SlidesApi } from "asposeslidescloud";
-import { Readable } from "stream";
+import { Readable, Stream } from "stream";
 
 const slidesApi = new SlidesApi(
   process.env.ASPOSE_API_CLIENT_ID!,
@@ -342,19 +338,24 @@ async function uploadPresentation(fileName: string) {
   }
 }
 
-uploadPresentation("../backend/src/helpers/Linkedin_content_template.pptx");
+// uploadPresentation("../backend/src/helpers/Linkedin_content_template.pptx");
 
 async function modifySlide(presentationName: string, slideIndex: number) {
   try {
     // Example: Add a new shape to the slide
-    const shape = new Shape();
-    shape.x = 100;
-    shape.y = 100;
-    shape.width = 200;
-    shape.height = 100;
-    shape.text = "Hello, Aspose!";
+    const mockName = "Linkedin_content_template.pptx";
+    const mockLayoutAlias = "titleSlide";
+    const mockPosition = 2;
+    const mockFolder = "documents";
+    const mockStorage = "localStorage";
 
-    await slidesApi.createShape(presentationName, slideIndex, shape);
+    const result = await slidesApi.createSlide(
+      mockName,
+      mockLayoutAlias,
+      mockPosition,
+      mockFolder,
+      mockStorage
+    );
     console.log("Shape added to slide successfully.");
   } catch (error) {
     console.error("Error modifying slide:", error);
@@ -364,4 +365,4 @@ async function modifySlide(presentationName: string, slideIndex: number) {
 const fileName = "Linkedin_content_template.pptx";
 const slideIndex = 1; // First slide
 
-modifySlide(fileName, slideIndex);
+// modifySlide(fileName, slideIndex);
