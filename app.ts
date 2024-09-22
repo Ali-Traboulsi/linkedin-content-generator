@@ -16,8 +16,8 @@ const port = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(bodyParser.json());
-app.post("/api/v1/create-post", upload.single("pdfFile"), createLinkedinPost);
 app.use("/api/v1", routes);
+app.post("/api/v1/create-post", upload.single("pdfFile"), createLinkedinPost);
 app.listen(port, () => {
   connectToDB();
   console.log(`Server running on http://localhost:${port}`);

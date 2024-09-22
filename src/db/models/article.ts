@@ -1,13 +1,30 @@
-const mongoose = require("mongoose");
+import { Model, Schema, Document, model } from "mongoose";
+
+export interface IArticle extends Document {
+  title: string;
+  content: string;
+  image: string;
+  url: string;
+  published: Date;
+  created: Date;
+  updated: Date;
+}
 
 // Define the schema for a tech article
-const articleSchema = new mongoose.Schema({
+const articleSchema: Schema<IArticle> = new Schema<IArticle>({
   title: { type: String, required: true },
   url: { type: String, required: true },
-  summary: String,
+  content: {
+    type: String,
+    required: true,
+  },
+  image: { type: String, required: false },
+  published: { type: Date, required: true },
   created: { type: Date, default: Date.now },
   updated: { type: Date, default: Date.now },
 });
 
-const Article = mongoose.model("Article", articleSchema);
-module.exports = Article;
+export const Article: Model<IArticle> = model<IArticle>(
+  "Article",
+  articleSchema
+);

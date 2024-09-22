@@ -4,10 +4,15 @@ import * as cheerio from "cheerio";
 import * as puppeteer from "puppeteer";
 import * as fs from "fs";
 import { cleanArticleContent } from "../../utils/article-cleaner";
+import { Request, Response } from "express";
+import { Article, IArticle } from "../db/models/article";
+import dotenv from "dotenv";
 
-export const scrapMainArticlesFromFcc = async () => {
+dotenv.config();
+
+export const scrapMainArticlesFromFcc = async (req: Request, res: Response) => {
   try {
-    const browser = await puppeteer.launch();
+    let browser = await puppeteer.launch({ headless: true });
     const page = await browser.newPage();
 
     await page.goto("https://www.freecodecamp.org/news/", {
@@ -26,31 +31,31 @@ export const scrapMainArticlesFromFcc = async () => {
     const articles: Array<{
       title?: string;
       link?: string;
-      excerpt?: string;
+      content?: string;
       imageUrl?: string;
+      tags?: Array<string>;
     }> = [];
 
     $(".post-card").each((i, element) => {
       const title = $(element).find(".post-card-title").text().trim();
-      const link = $(element).find("a").attr("href");
+      let link = $(element).find("a").attr("href");
       const excerpt = $(element).find(".post-card-description").text().trim();
-      const imageUrl = $(element).find("img").attr("src");
+      let imageUrl = $(element).find("img").attr("src");
+      const tags = $(element)
+        .find(".post-card-tags a")
+        .map((i, el) => $(el).text())
+        .get();
       // Store each article in an object
       const articleData = {
         title,
         link,
-        excerpt,
+        content,
         imageUrl,
+        tags,
       };
 
       // Push the article data to the array
       articles.push(articleData);
-
-      console.log(`Featured Article ${i + 1}:`);
-      console.log(`Title: ${title}`);
-      console.log(`Link: ${link}`);
-      console.log(`Excerpt: ${excerpt}`);
-      console.log(`Image URL: ${imageUrl}`);
     });
 
     // Write all article data to a file
@@ -59,8 +64,9 @@ export const scrapMainArticlesFromFcc = async () => {
         (article) => `
           Title: ${article.title}
           Link: ${article.link}
-          Excerpt: ${article.excerpt}
+          Content: ${article.content}
           Image URL: ${article.imageUrl}
+          Tags: ${article.tags?.join(", ")}
         `
       )
       .join("\n\n");
@@ -71,60 +77,59 @@ export const scrapMainArticlesFromFcc = async () => {
       "utf-8"
     );
 
+    res
+      .status(200)
+      .send({ message: "Articles scraped successfully", data: articles });
+
     await browser.close();
-
-    // console.log("Scraping TechCrunch", $);
-
-    // // Select the div with the class 'is-featured'
-    // const featured = $("div.is-featured");
-
-    // // Extract the article title (h2) inside the featured div
-    // const title = featured.find("h2 a").text().trim();
-
-    // // Extract the article link from the anchor (a) tag inside the h2
-    // const link = featured.find("h2 a").attr("href");
-
-    // // Extract the article description (excerpt)
-    // const excerpt = featured.find(".wp-block-post-excerpt p").text().trim();
-
-    // // Extract the image URL from the figure
-    // const imageUrl = featured.find("figure img").attr("src");
-
-    // // Extract the author's name and link
-    // const author = featured
-    //   .find(".wp-block-tc23-author-card-name a")
-    //   .text()
-    //   .trim();
-    // const authorLink = featured
-    //   .find(".wp-block-tc23-author-card-name a")
-    //   .attr("href");
-
-    // // Extract the time of publication
-    // const timeAgo = featured.find("time").text().trim();
-
-    // console.log("Featured article:");
-    // console.log(`Title: ${title}`);
-    // console.log(`Link: ${link}`);
-    // console.log(`Excerpt: ${excerpt}`);
-    // console.log(`Image URL: ${imageUrl}`);
-    // console.log(`Author: ${author}`);
-    // console.log(`Author Link: ${authorLink}`);
-    // console.log(`Published: ${timeAgo}`);
-
-    // Close the browser
-    // await browser.close();
   } catch (error) {
     console.error("Error scraping TechCrunch:", error);
+    res.status(500).json({ message: "Error scraping FreeCodeCamp", error });
+  } finally {
+    res.end();
   }
 };
+export const scrapArticleByLink = async (req: Request, res: Response) => {
+  const { link } = req.params;
 
-export const scrapRandomArticleFromFCC = async () => {
+  const browser = await puppeteer.launch();
+
+  const page = await browser.newPage();
+
+  await page.goto(`${process.env.FCC_BASE_LINK}${link}`, {
+    waitUntil: "networkidle2",
+  });
+
+  const content = await page.content();
+
+  const $ = cheerio.load(content);
+
+  const articleContent = $(".post-content").text().trim();
+  const articleAuthor = $(".author-card-name").text();
+  const articleFeatureImage = $('[data-test-label="feature-image"');
+  const articlePublishedDate = $(".post-full-meta-date").text().trim();
+
+  const article = {
+    content: cleanArticleContent(articleContent),
+    author: articleAuthor,
+    image: articleFeatureImage,
+    date: articlePublishedDate,
+  };
+
+  return res.status(200).send({
+    message: "Article scraped successfully",
+    data: article,
+  });
+};
+
+export const scrapRandomArticleFromFCC = async (
+  req: Request,
+  res: Response
+) => {
   try {
     const articles = JSON.parse(
       fs.readFileSync("freecodecamp_articles.json", "utf-8")
     );
-
-    const baseLink = "https://www.freecodecamp.org";
 
     // Step 2: Randomly select an article
     const randomIndex = Math.floor(Math.random() * articles.length);
@@ -135,7 +140,7 @@ export const scrapRandomArticleFromFCC = async () => {
     // Step 3: Launch Puppeteer and navigate to the selected article URL
     const browser = await puppeteer.launch();
     const page = await browser.newPage();
-    await page.goto(`${baseLink}${selectedArticle.link}`, {
+    await page.goto(`${process.env.FCC_BASE_LINK}${selectedArticle.link}`, {
       waitUntil: "networkidle2",
     });
 
@@ -172,63 +177,57 @@ export const scrapRandomArticleFromFCC = async () => {
       "utf-8"
     );
 
+    res
+      .status(200)
+      .send({ message: "Article scraped successfully", data: article });
+
     await browser.close();
   } catch (error) {
     console.error("Error scraping random article:", error);
+    res.status(500).json({ message: "Error scraping random article", error });
+  } finally {
+    res.end();
   }
 };
 
-// export const scrapTechNews = async () => {
-//   try {
-//     const { data: markup } = await axios.get("https://techcrunch.com/");
-//     const $ = cheerio.load(markup);
-//     console.log("Scraping TechCrunch");
-//     // console.log($);
+export const saveDataToMongoDB = async (req: Request, res: Response) => {
+  try {
+    const scrapedArticles = req.body.articles;
 
-//     $("article a").each((i, element) => {
-//       const title = $(element).text().trim();
-//       console.log(`Article ${i + 1}: ${title}`);
-//     });
+    console.log("Scraped articles:", scrapedArticles);
 
-//     const featured = $("div.is-featured");
+    const articlesToInsert = scrapedArticles.map((article: IArticle) => {
+      return {
+        title: article.title,
+        content: article.content,
+        image: article.image,
+        url: article.url,
+      };
+    });
 
-//     console.log("Featured article: ", featured);
+    console.log("Articles to insert:", articlesToInsert);
 
-//     // Extract the article title (h2) inside the featured div
-//     const title = featured.find("h2 a").text().trim();
+    await Article.insertMany(articlesToInsert);
 
-//     // Extract the article description (excerpt)
-//     const excerpt = featured.find(".wp-block-post-excerpt p").text().trim();
+    res
+      .status(200)
+      .send({ message: "Articles scraped and saved successfully." });
+  } catch (error) {
+    console.error("Error scraping articles:", error);
+    res.status(500).json({ error: "Failed to scrape articles." });
+  }
+};
 
-//     // Extract the image URL from the figure
-//     const imageUrl = featured.find("figure img").attr("src");
+export const getScrapedArticlesFromDB = async (req: Request, res: Response) => {
+  try {
+    const articles = await Article.find();
+    res
+      .status(200)
+      .send({ message: "Articles fetched successfully", data: articles });
+  } catch (error) {
+    console.error("Error fetching articles:", error);
+    res.status(500).json({ message: "Error fetching articles", error });
+  }
+};
 
-//     // Extract the article link from the anchor (a) tag inside the h2
-//     const link = featured.find("h2 a").attr("href");
-
-//     // Extract the author's name and link
-//     const author = featured
-//       .find(".wp-block-tc23-author-card-name a")
-//       .text()
-//       .trim();
-//     const authorLink = featured
-//       .find(".wp-block-tc23-author-card-name a")
-//       .attr("href");
-
-//     // Extract the time of publication
-//     const timeAgo = featured.find("time").text().trim();
-
-//     console.log("Featured article:");
-//     console.log(`Title: ${title}`);
-//     console.log(`Link: ${link}`);
-//     console.log(`Excerpt: ${excerpt}`);
-//     console.log(`Image URL: ${imageUrl}`);
-//     console.log(`Author: ${author}`);
-//     console.log(`Author Link: ${authorLink}`);
-//     console.log(`Published: ${timeAgo}`);
-
-//     console.log("Featured article: ", featured.text());
-//   } catch (error) {
-//     console.error("Error scraping TechCrunch:", error);
-//   }
-// };
+export const scrapArticleDetails = async (req: Request, res: Response) => {};
